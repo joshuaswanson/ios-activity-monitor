@@ -2,6 +2,8 @@
 
 A live process monitor for a USB-tethered iPhone or iPad. Like macOS Activity Monitor, but for iOS.
 
+![screenshot](assets/screenshot.png)
+
 Streams per-process CPU, memory and thread counts from the device in real time over the [`pymobiledevice3`](https://github.com/doronz88/pymobiledevice3) developer tunnel, and renders them in a clean web dashboard with hover-to-explain tooltips for common iOS daemons.
 
 Useful when your iPhone is running hot and you want to know why.
