@@ -148,6 +148,18 @@ body {
 .summary .battery.hot [data-bind="battery-temp"] {
   color: var(--alert);
 }
+.battery-state {
+  margin-left: 6px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  text-transform: lowercase;
+}
+.battery.warm .battery-state {
+  color: var(--accent);
+}
+.battery.hot .battery-state {
+  color: var(--alert);
+}
 .battery-charge {
   margin-left: 6px;
   font-size: 11px;
@@ -156,11 +168,6 @@ body {
 .battery-charge::before {
   content: "·";
   margin-right: 6px;
-}
-.summary .device-product-raw {
-  color: var(--text-faint);
-  font-size: 11px;
-  margin-left: 4px;
 }
 .sep {
   color: var(--text-faint);

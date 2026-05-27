@@ -53,6 +53,14 @@ class SampleHub:
         self._latest: Optional[dict] = None
         self._battery: Optional[BatteryInfo] = None
         self._error: Optional[str] = None
+        self._pending_interval_ms: Optional[int] = None
+
+    def set_interval(self, ms: int) -> None:
+        if not (100 <= ms <= 60000):
+            return
+        if ms == self.interval_ms:
+            return
+        self._pending_interval_ms = ms
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._run(), name="sample-hub")
@@ -89,16 +97,25 @@ class SampleHub:
     async def _run(self) -> None:
         backoff = 1.0
         while True:
+            interval_changed = False
             try:
                 async for samples in stream_samples(
                     self.target,
                     interval_ms=self.interval_ms,
                     rsd_address=self.rsd_address,
                 ):
+                    if self._pending_interval_ms is not None:
+                        self.interval_ms = self._pending_interval_ms
+                        self._pending_interval_ms = None
+                        interval_changed = True
+                        break
                     self._error = None
                     self._latest = self._build_payload(samples)
                     self._broadcast(self._latest)
                     backoff = 1.0
+                if interval_changed:
+                    # restart immediately with new interval; no backoff, no error
+                    continue
                 self._error = "stream ended unexpectedly"
             except asyncio.CancelledError:
                 raise
@@ -188,7 +205,27 @@ def make_app(
     async def ws(websocket: WebSocket) -> None:
         await websocket.accept()
         queue = hub.subscribe()
+
+        async def _reader() -> None:
+            try:
+                while True:
+                    raw = await websocket.receive_text()
+                    try:
+                        msg = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if msg.get("cmd") == "set_sample_interval":
+                        ms = msg.get("ms")
+                        if isinstance(ms, (int, float)):
+                            hub.set_interval(int(ms))
+            except WebSocketDisconnect:
+                return
+
+        reader = asyncio.create_task(_reader())
         try:
+            await websocket.send_text(
+                json.dumps({"type": "hello", "interval_ms": hub.interval_ms})
+            )
             if hub.latest is not None:
                 await websocket.send_text(json.dumps(hub.latest))
             elif hub.error is not None:
@@ -199,6 +236,7 @@ def make_app(
         except WebSocketDisconnect:
             return
         finally:
+            reader.cancel()
             hub.unsubscribe(queue)
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

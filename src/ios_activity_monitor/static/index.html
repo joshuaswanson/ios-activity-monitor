@@ -10,13 +10,30 @@
     <header class="bar">
       <h1>iOS Activity Monitor</h1>
       <div class="bar-right">
-        <label class="rate-select">
-          <span>UI refresh</span>
+        <label
+          class="rate-select"
+          title="How often the dashboard repaints. Backend keeps sampling at the rate below; the UI just throttles re-renders so values aren't jittery."
+        >
+          <span>UI</span>
           <select id="ui-rate">
             <option value="1000">1 s</option>
             <option value="2000">2 s</option>
+            <option value="5000" selected>5 s</option>
+            <option value="10000">10 s</option>
+            <option value="30000">30 s</option>
+          </select>
+        </label>
+        <label
+          class="rate-select"
+          title="How often the iPhone collects a process snapshot. Faster = more data but more CPU/heat on the phone."
+        >
+          <span>Sample</span>
+          <select id="sample-rate">
+            <option value="500">0.5 s</option>
+            <option value="1000" selected>1 s</option>
+            <option value="2000">2 s</option>
             <option value="5000">5 s</option>
-            <option value="10000" selected>10 s</option>
+            <option value="10000">10 s</option>
             <option value="30000">30 s</option>
           </select>
         </label>
@@ -31,7 +48,6 @@
       <span data-bind="device-name">—</span>
       <span class="sep">·</span>
       <span data-bind="device-product">—</span>
-      <span class="device-product-raw" data-bind="device-product-raw"></span>
       <span class="sep">·</span>
       <span>iOS <span data-bind="device-ios">—</span></span>
       <span class="sep">·</span>
@@ -44,6 +60,7 @@
       <span class="battery" data-bind="battery-wrap">
         battery
         <span data-bind="battery-temp">—</span>°C
+        <span class="battery-state" data-bind="battery-state"></span>
         <span class="battery-charge" data-bind="battery-charge"></span>
       </span>
     </section>

@@ -3,7 +3,7 @@
 
 const MAX_VISIBLE = 40;
 const SPARK_LEN = 30;
-const UI_RATE_DEFAULT = 10000;
+const UI_RATE_DEFAULT = 5000;
 
 const state = {
   sortKey: "cpu",
@@ -74,13 +74,47 @@ if (rateSelect) {
   });
 }
 
+// ─── sample-rate control ────────────────────────────────────────────
+let activeWS = null;
+function sendSampleInterval(ms) {
+  if (activeWS && activeWS.readyState === WebSocket.OPEN) {
+    activeWS.send(JSON.stringify({ cmd: "set_sample_interval", ms }));
+  }
+}
+
+const sampleSelect = document.getElementById("sample-rate");
+if (sampleSelect) {
+  const stored = parseInt(
+    localStorage.getItem("iam-sample-interval-ms") || "",
+    10,
+  );
+  if (Number.isFinite(stored) && stored > 0) {
+    sampleSelect.value = String(stored);
+  }
+  sampleSelect.addEventListener("change", () => {
+    const ms = parseInt(sampleSelect.value, 10);
+    if (Number.isFinite(ms) && ms > 0) {
+      localStorage.setItem("iam-sample-interval-ms", String(ms));
+      sendSampleInterval(ms);
+    }
+  });
+}
+
 // ─── ws connection ───────────────────────────────────────────────────
 function connect() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const ws = new WebSocket(`${proto}//${location.host}/ws`);
+  activeWS = ws;
   setStatus("connecting", "connecting…");
 
-  ws.addEventListener("open", () => setStatus("live", "live"));
+  ws.addEventListener("open", () => {
+    setStatus("live", "live");
+    // push the persisted sample interval on (re)connect
+    if (sampleSelect) {
+      const ms = parseInt(sampleSelect.value, 10);
+      if (Number.isFinite(ms) && ms > 0) sendSampleInterval(ms);
+    }
+  });
   ws.addEventListener("message", (ev) => {
     let payload;
     try {
@@ -126,13 +160,25 @@ function renderBattery(b) {
   wrap.classList.remove("warm", "hot");
   if (!b || b.temp_c == null) {
     bind("battery-temp").textContent = "—";
+    bind("battery-state").textContent = "";
     bind("battery-charge").textContent = "";
     return;
   }
   const t = b.temp_c;
-  if (t >= 40) wrap.classList.add("hot");
-  else if (t >= 35) wrap.classList.add("warm");
+  let label;
+  if (t >= 41) {
+    wrap.classList.add("hot");
+    label = "hot";
+  } else if (t >= 37) {
+    wrap.classList.add("warm");
+    label = "warm";
+  } else if (t >= 33) {
+    label = "mild";
+  } else {
+    label = "cool";
+  }
   bind("battery-temp").textContent = t.toFixed(1);
+  bind("battery-state").textContent = label;
   const charge =
     b.level_pct != null
       ? `${b.level_pct}%${b.is_charging ? " charging" : ""}`
@@ -162,8 +208,6 @@ function render(payload) {
   const marketing =
     (window.lookupDevice && window.lookupDevice(productRaw)) || null;
   bind("device-product").textContent = marketing || productRaw;
-  const rawEl = bind("device-product-raw");
-  if (rawEl) rawEl.textContent = marketing ? `(${productRaw})` : "";
   bind("device-ios").textContent = payload.device.product_version;
 
   const t = payload.totals;
