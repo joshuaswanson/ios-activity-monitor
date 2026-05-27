@@ -1,0 +1,21 @@
+[project]
+name = "ios-activity-monitor"
+version = "0.1.0"
+description = "Live process activity monitor for a tethered iOS device."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.136.3",
+    "pymobiledevice3>=9.15.1",
+    "textual>=8.2.7",
+    "uvicorn[standard]>=0.48.0",
+]
+
+[project.scripts]
+ios-activity-monitor = "ios_activity_monitor.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ios_activity_monitor"]
