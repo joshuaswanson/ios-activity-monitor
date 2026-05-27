@@ -31,46 +31,42 @@ uv sync
 
 ## Usage
 
-There are two steps because the iOS 17+ developer tunnel needs root.
+```bash
+./start
+```
 
-**1. Start the tunnel daemon** (in one terminal, leave running):
+That's it. The script:
+
+1. Checks that an iPhone/iPad is plugged in.
+2. Starts the `pymobiledevice3` tunnel daemon (will prompt for your Mac password once).
+3. Launches the dashboard.
+4. Opens it in your browser.
+
+Press **Ctrl+C** once to stop everything.
+
+### Manual / advanced
+
+If you prefer to run the pieces separately:
 
 ```bash
+# terminal 1 — leave running
 sudo uv run pymobiledevice3 remote tunneld
+
+# terminal 2
+uv run ios-activity-monitor --web        # dashboard
+uv run ios-activity-monitor              # terminal TUI
 ```
 
-This runs a tunnel manager at `127.0.0.1:49151`. The monitor auto-discovers connected devices through it, so you don't have to copy any addresses between terminals, and if the phone disconnects and comes back, the monitor reconnects automatically.
-
-**2. Start the monitor** (in another terminal):
-
-Web dashboard (recommended):
+If you don't want to run the daemon at all, you can use a one-shot tunnel and pass its address through:
 
 ```bash
-uv run ios-activity-monitor --web
-```
-
-Then open <http://127.0.0.1:8732>.
-
-Terminal TUI:
-
-```bash
-uv run ios-activity-monitor
-```
-
-### Alternative: one-shot tunnel
-
-If you prefer not to run the daemon, you can use a single ad-hoc tunnel. It prints an RSD address that you pass to the monitor:
-
-```bash
-# terminal 1
 sudo uv run pymobiledevice3 lockdown start-tunnel
 # prints:  --rsd fd75:1790:bc47::1 61947
 
-# terminal 2
 uv run ios-activity-monitor --web --rsd fd75:1790:bc47::1 61947
 ```
 
-The downside: the RSD address regenerates every time the tunnel restarts, and a USB hiccup will require you to restart both the tunnel and the monitor.
+The downside of the one-shot tunnel: the address regenerates on every tunnel restart, and a USB hiccup forces you to restart both the tunnel and the monitor.
 
 ### Options
 

@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+#
+# One-command launcher for ios-activity-monitor.
+#
+# Usage:  ./start
+#
+# What it does:
+#   1. Checks if the pymobiledevice3 `tunneld` daemon is running on 127.0.0.1:49151.
+#   2. If not, starts it with sudo and waits for it to be ready (prompts for your
+#      Mac password once; will not re-prompt while the script is running).
+#   3. Launches the web dashboard.
+#   4. Opens it in your default browser.
+#
+# Ctrl+C once: stops the monitor and the tunnel (only if we started it).
+#
+set -euo pipefail
+
+PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PORT="${PORT:-8732}"
+TUNNELD_HOST="127.0.0.1"
+TUNNELD_PORT="49151"
+TUNNELD_PID=""
+MONITOR_PID=""
+WE_STARTED_TUNNELD=0
+
+cyan()  { printf "\033[36m%s\033[0m\n" "$*"; }
+green() { printf "\033[32m%s\033[0m\n" "$*"; }
+red()   { printf "\033[31m%s\033[0m\n" "$*"; }
+dim()   { printf "\033[2m%s\033[0m\n" "$*"; }
+
+cleanup() {
+    echo
+    dim "shutting down…"
+    if [[ -n "$MONITOR_PID" ]] && kill -0 "$MONITOR_PID" 2>/dev/null; then
+        kill "$MONITOR_PID" 2>/dev/null || true
+        wait "$MONITOR_PID" 2>/dev/null || true
+    fi
+    if [[ "$WE_STARTED_TUNNELD" -eq 1 ]] && [[ -n "$TUNNELD_PID" ]]; then
+        # tunneld was launched via sudo, so killing it needs sudo too
+        sudo kill "$TUNNELD_PID" 2>/dev/null || true
+    fi
+    exit 0
+}
+trap cleanup INT TERM
+
+tunneld_up() {
+    curl -fsS --max-time 1 "http://${TUNNELD_HOST}:${TUNNELD_PORT}/" >/dev/null 2>&1
+}
+
+phone_connected() {
+    cd "$PROJECT_DIR"
+    local count
+    count="$(uv run --quiet pymobiledevice3 usbmux list 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)"
+    [[ "$count" -gt 0 ]]
+}
+
+# ── pre-flight ──────────────────────────────────────────────────────
+cd "$PROJECT_DIR"
+
+cyan "iOS Activity Monitor"
+
+if ! phone_connected; then
+    red "no iPhone or iPad detected on USB."
+    dim  "plug your phone in, unlock it, tap Trust if prompted, and try again."
+    exit 1
+fi
+
+# ── tunneld ─────────────────────────────────────────────────────────
+if tunneld_up; then
+    green "✓ tunneld already running at ${TUNNELD_HOST}:${TUNNELD_PORT}"
+else
+    cyan "starting tunneld (needs sudo)…"
+    # cache sudo creds up front so the background launch doesn't prompt later
+    sudo -v
+    sudo uv run --project "$PROJECT_DIR" pymobiledevice3 remote tunneld \
+        >/tmp/iam-tunneld.log 2>&1 &
+    TUNNELD_PID=$!
+    WE_STARTED_TUNNELD=1
+
+    # wait for it to come up (up to ~15s)
+    for i in $(seq 1 30); do
+        sleep 0.5
+        if tunneld_up; then
+            green "✓ tunneld up after $(echo "$i * 0.5" | bc)s"
+            break
+        fi
+        if ! kill -0 "$TUNNELD_PID" 2>/dev/null; then
+            red "tunneld exited unexpectedly. last log lines:"
+            tail -n 10 /tmp/iam-tunneld.log || true
+            exit 1
+        fi
+    done
+
+    if ! tunneld_up; then
+        red "tunneld did not come up within 15s. log:"
+        tail -n 20 /tmp/iam-tunneld.log || true
+        cleanup
+        exit 1
+    fi
+fi
+
+# ── monitor ─────────────────────────────────────────────────────────
+cyan "starting dashboard on http://127.0.0.1:${PORT}"
+uv run --project "$PROJECT_DIR" ios-activity-monitor --web --port "$PORT" &
+MONITOR_PID=$!
+
+# wait for the web server to be reachable, then open the browser
+for i in $(seq 1 30); do
+    sleep 0.5
+    if curl -fsS --max-time 1 "http://127.0.0.1:${PORT}/api/snapshot" >/dev/null 2>&1; then
+        break
+    fi
+done
+
+green "✓ dashboard ready → http://127.0.0.1:${PORT}"
+open "http://127.0.0.1:${PORT}" 2>/dev/null || true
+
+dim "Ctrl+C to stop"
+wait "$MONITOR_PID"
