@@ -46,6 +46,20 @@ That's it. The script:
 
 Press **Ctrl+C** once to stop everything.
 
+### WiFi mode (no cable)
+
+```bash
+./start --wifi
+```
+
+Once the device has been paired with this Mac over USB at least once, you can run the monitor without the cable plugged in. Requirements:
+
+- Phone is on the same WiFi network as this Mac.
+- Developer Mode is on, phone is unlocked, screen on.
+- The initial USB pairing has been done (so the trust record exists on this Mac).
+
+Caveats: it's slower and flakier than USB, and the phone going to sleep will drop the stream. The dashboard reconnects automatically when the device comes back. Bluetooth alone is not supported; the developer tunnel runs over TCP/QUIC on the local network.
+
 ### Manual / advanced
 
 If you prefer to run the pieces separately:
@@ -80,6 +94,7 @@ The downside of the one-shot tunnel: the address regenerates on every tunnel res
 | `--host HOST`     | `127.0.0.1`     | Web bind host.                                                   |
 | `--port PORT`     | `8732`          | Web bind port.                                                   |
 | `--rsd HOST PORT` | (auto)          | Connect directly to an RSD address from `lockdown start-tunnel`. |
+| `--wifi`          | off             | Discover the device over WiFi via tunneld instead of USB.        |
 
 ### First-run setup on the iPhone
 

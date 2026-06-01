@@ -31,12 +31,20 @@ def main() -> int:
     parser.add_argument("--web", action="store_true", help="Launch the web dashboard instead of the TUI.")
     parser.add_argument("--host", default="127.0.0.1", help="Web dashboard bind host (default: 127.0.0.1).")
     parser.add_argument("--port", type=int, default=8732, help="Web dashboard bind port (default: 8732).")
+    parser.add_argument(
+        "--wifi",
+        action="store_true",
+        help=(
+            "Discover the device via tunneld over WiFi instead of USB. "
+            "Requires a one-time USB pair, same WiFi network, and tunneld running."
+        ),
+    )
     args = parser.parse_args()
 
     rsd_address = (args.rsd[0], int(args.rsd[1])) if args.rsd else None
 
     try:
-        target = asyncio.run(discover_device(args.udid))
+        target = asyncio.run(discover_device(args.udid, wifi=args.wifi))
     except NoDeviceError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -44,7 +52,7 @@ def main() -> int:
     print(f"Connecting to {target.name} (iOS {target.product_version})…", file=sys.stderr)
 
     if args.web:
-        return _run_web(target, rsd_address, args.interval, args.host, args.port)
+        return _run_web(target, rsd_address, args.interval, args.host, args.port, args.wifi)
 
     from ios_activity_monitor.tui import ActivityMonitorApp
 
@@ -56,11 +64,16 @@ def main() -> int:
     return 0
 
 
-def _run_web(target, rsd_address, interval_ms, host, port) -> int:
+def _run_web(target, rsd_address, interval_ms, host, port, wifi) -> int:
     import uvicorn
     from ios_activity_monitor.web import make_app
 
-    app = make_app(target=target, rsd_address=rsd_address, interval_ms=interval_ms)
+    app = make_app(
+        target=target,
+        rsd_address=rsd_address,
+        interval_ms=interval_ms,
+        wifi=wifi,
+    )
     url = f"http://{host}:{port}"
     print(f"  dashboard → {url}", file=sys.stderr)
     print("  ctrl-c to stop", file=sys.stderr)
