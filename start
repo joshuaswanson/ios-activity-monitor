@@ -42,7 +42,6 @@ TUNNELD_HOST="127.0.0.1"
 TUNNELD_PORT="49151"
 TUNNELD_PID=""
 MONITOR_PID=""
-PINNER_PID=""
 WE_STARTED_TUNNELD=0
 
 cyan()  { printf "\033[36m%s\033[0m\n" "$*"; }
@@ -56,9 +55,6 @@ cleanup() {
     if [[ -n "$MONITOR_PID" ]] && kill -0 "$MONITOR_PID" 2>/dev/null; then
         kill "$MONITOR_PID" 2>/dev/null || true
         wait "$MONITOR_PID" 2>/dev/null || true
-    fi
-    if [[ -n "$PINNER_PID" ]]; then
-        sudo kill "$PINNER_PID" 2>/dev/null || true
     fi
     if [[ "$WE_STARTED_TUNNELD" -eq 1 ]] && [[ -n "$TUNNELD_PID" ]]; then
         # tunneld was launched via sudo, so killing it needs sudo too
@@ -126,15 +122,6 @@ else
         exit 1
     fi
 fi
-
-# ── route pinner ────────────────────────────────────────────────────
-# Make sure a VPN's IPv6 default route doesn't swallow the tunnel address.
-# Idempotent and harmless when no VPN is up.
-cyan "starting route-pinner (overrides VPN routes for tunnel ULAs)…"
-sudo -v
-sudo uv run --project "$PROJECT_DIR" python -m ios_activity_monitor.route_pinner \
-    >/tmp/iam-route-pinner.log 2>&1 &
-PINNER_PID=$!
 
 # ── monitor ─────────────────────────────────────────────────────────
 cyan "starting dashboard on http://127.0.0.1:${PORT}"
