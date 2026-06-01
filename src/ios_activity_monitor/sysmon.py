@@ -139,6 +139,17 @@ async def _resolve_rsd(
             "`sudo uv run pymobiledevice3 remote tunneld`, "
             "or pass --rsd HOST PORT from a manual `lockdown start-tunnel` session."
         ) from exc
+    except IndexError as exc:
+        # pymobiledevice3 bug: get_tunneld_device_by_udid does rsds[0] without
+        # checking emptiness. Empty list means tunneld lists a tunnel for this
+        # UDID but rsd.connect() to its address failed, almost always a stale
+        # tunnel entry from a prior cable disconnect.
+        raise NoTunnelError(
+            f"tunneld has a stale tunnel for {udid}: the listed address is not "
+            "reachable. Unplug and replug the cable; if that doesn't heal it, "
+            "restart tunneld: "
+            "sudo pkill -f 'pymobiledevice3 remote tunneld' && ./start"
+        ) from exc
     if rsd is not None:
         return rsd
     rsds = await get_tunneld_devices()

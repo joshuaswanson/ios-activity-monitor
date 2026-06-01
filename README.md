@@ -60,6 +60,12 @@ Once the device has been paired with this Mac over USB at least once, you can ru
 
 Caveats: it's slower and flakier than USB, and the phone going to sleep will drop the stream. The dashboard reconnects automatically when the device comes back. Bluetooth alone is not supported; the developer tunnel runs over TCP/QUIC on the local network.
 
+### VPN compatibility
+
+iOS 17+ developer services tunnel over a per-session IPv6 ULA address (`fd00::/8`), even when you're on a cable. Most VPNs claim `::/0` for IPv6 and silently swallow that traffic before it reaches the tunnel interface.
+
+`./start` launches a tiny `route-pinner` daemon alongside `tunneld` that watches for new tunnel interfaces and installs a more-specific `/64` IPv6 route for each one, so the VPN's catch-all route loses the longest-prefix match. It's a no-op when no VPN is connected.
+
 ### Manual / advanced
 
 If you prefer to run the pieces separately:
