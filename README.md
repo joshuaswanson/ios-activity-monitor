@@ -4,15 +4,15 @@ A live process monitor for a USB-tethered iPhone or iPad. Like macOS Activity Mo
 
 ![screenshot](assets/screenshot.png)
 
-Streams per-process CPU, memory and thread counts from the device in real time over the [`pymobiledevice3`](https://github.com/doronz88/pymobiledevice3) developer tunnel, and renders them in a clean web dashboard with hover-to-explain tooltips for common iOS daemons.
+Streams per-process CPU, memory and thread counts from the device in real time over the [`pymobiledevice3`](https://github.com/doronz88/pymobiledevice3) developer tunnel, and renders them in a web dashboard with hover-to-explain tooltips for common iOS daemons.
 
 Useful when your iPhone is running hot and you want to know why.
 
 ## Features
 
 - Live process list with CPU%, resident memory, thread count (updates every second).
-- Sortable columns; sparkline trend per row over the last 30 seconds.
-- Hover any process for a plain-English description of what it does — and, if it's running hot, an explanation of what that usually means.
+- Sortable columns, with a sparkline trend per row over the last 30 seconds.
+- Hover any process for a plain-English description of what it does, and, if it's running hot, an explanation of what that usually means.
 - iOS marketing name lookup (so `iPhone14,3` shows as "iPhone 13 Pro Max").
 - Terminal TUI mode if you don't want the web UI.
 
@@ -37,7 +37,7 @@ uv sync
 ./start
 ```
 
-That's it. The script:
+The script:
 
 1. Checks that an iPhone/iPad is plugged in.
 2. Starts the `pymobiledevice3` tunnel daemon (will prompt for your Mac password once).
@@ -58,20 +58,20 @@ Once the device has been paired with this Mac over USB at least once, you can ru
 - Developer Mode is on, phone is unlocked, screen on.
 - The initial USB pairing has been done (so the trust record exists on this Mac).
 
-Caveats: it's slower and flakier than USB, and the phone going to sleep will drop the stream. The dashboard reconnects automatically when the device comes back. Bluetooth alone is not supported; the developer tunnel runs over TCP/QUIC on the local network.
+There are caveats. It's slower and less reliable than USB, and the phone going to sleep will drop the stream. The dashboard reconnects automatically when the device comes back. Bluetooth alone is not supported. The developer tunnel runs over TCP/QUIC on the local network.
 
 ### VPN caveat
 
 iOS 17+ developer services tunnel over a per-session IPv6 ULA address (`fd00::/8`), even when you're on a cable. If you're on a corporate / "always-on" VPN that uses macOS's Network Extension framework (Cisco AnyConnect, GlobalProtect, etc.), it will silently route the tunnel traffic out the VPN and the dashboard will never see any data.
 
-Workaround: disconnect from the VPN while you're using the monitor. Route-table fixes don't help because Network Extension policies override the routing table at the socket layer.
+To work around this, disconnect from the VPN while you're using the monitor. Route-table fixes don't help because Network Extension policies override the routing table at the socket layer.
 
 ### Manual / advanced
 
 If you prefer to run the pieces separately:
 
 ```bash
-# terminal 1 — leave running
+# terminal 1 (leave running)
 sudo uv run pymobiledevice3 remote tunneld
 
 # terminal 2
@@ -88,7 +88,7 @@ sudo uv run pymobiledevice3 lockdown start-tunnel
 uv run ios-activity-monitor --web --rsd fd75:1790:bc47::1 61947
 ```
 
-The downside of the one-shot tunnel: the address regenerates on every tunnel restart, and a USB hiccup forces you to restart both the tunnel and the monitor.
+The one-shot tunnel has two drawbacks. The address regenerates on every tunnel restart, and a USB interruption forces you to restart both the tunnel and the monitor.
 
 ### Options
 
@@ -114,7 +114,7 @@ uv run pymobiledevice3 amfi reveal-developer-mode
 
 ## How it works
 
-The dashboard subscribes to the [`com.apple.instruments.server.services.sysmontap`](https://github.com/doronz88/pymobiledevice3) service on the device — the same one Xcode's Instruments uses for its "Activity Monitor" template — and broadcasts each snapshot to the browser over a WebSocket. The frontend is plain HTML/CSS/vanilla JS (no build step).
+The dashboard subscribes to the [`com.apple.instruments.server.services.sysmontap`](https://github.com/doronz88/pymobiledevice3) service on the device (the same one Xcode's Instruments uses for its "Activity Monitor" template) and broadcasts each snapshot to the browser over a WebSocket. The frontend is plain HTML/CSS/vanilla JS (no build step).
 
 Backend: FastAPI + uvicorn + pymobiledevice3 + (optionally) Textual for the TUI.
 
@@ -122,7 +122,7 @@ Backend: FastAPI + uvicorn + pymobiledevice3 + (optionally) Textual for the TUI.
 
 - Process names are the BSD short names (≤16 chars). For full bundle IDs you'd need a separate lookup.
 - The data-collection services themselves (`DTServiceHub`, `sysmond`, `remotepairingdeviced`) will always appear in the top of _your_ list. Ignore them.
-- CPU% is per single core — a multi-threaded process can exceed 100% (e.g. 250% means it's using ~2.5 cores).
+- CPU% is per single core, so a multi-threaded process can exceed 100% (e.g. 250% means it's using ~2.5 cores).
 
 ## Support
 
