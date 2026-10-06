@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator, Optional
 
@@ -16,6 +17,8 @@ from pymobiledevice3.tunneld.api import (
     get_tunneld_devices,
 )
 from pymobiledevice3.usbmux import list_devices
+
+from ios_activity_monitor.usb_tunnel import open_usb_tunnel
 
 
 @dataclass(slots=True)
@@ -162,6 +165,25 @@ async def _resolve_rsd(
     )
 
 
+async def _is_on_usbmux(udid: str) -> bool:
+    return any(dev.matches_udid(udid) for dev in await list_devices())
+
+
+@asynccontextmanager
+async def _open_rsd(
+    udid: str, rsd_address: Optional[tuple[str, int]], wifi: bool
+) -> AsyncIterator[RemoteServiceDiscoveryService]:
+    if rsd_address is None and not wifi and await _is_on_usbmux(udid):
+        async with open_usb_tunnel(udid) as tunnel:
+            rsd = await tunnel.connect_rsd()
+            try:
+                yield rsd
+            finally:
+                await rsd.close()
+        return
+    yield await _resolve_rsd(udid, rsd_address=rsd_address)
+
+
 def _normalize(raw: dict) -> Optional[ProcessSample]:
     pid = raw.get("pid")
     if not isinstance(pid, int) or pid < 0:
@@ -186,10 +208,14 @@ async def stream_samples(
     target: DeviceTarget,
     interval_ms: int = 1000,
     rsd_address: Optional[tuple[str, int]] = None,
+    wifi: bool = False,
 ) -> AsyncIterator[list[ProcessSample]]:
-    rsd = await _resolve_rsd(target.udid, rsd_address=rsd_address)
     skip_first = True
-    async with DvtProvider(rsd) as dvt, await Sysmontap.create(dvt, interval=interval_ms) as sysmon:
+    async with (
+        _open_rsd(target.udid, rsd_address, wifi) as rsd,
+        DvtProvider(rsd) as dvt,
+        await Sysmontap.create(dvt, interval=interval_ms) as sysmon,
+    ):
         async for snapshot in sysmon.iter_processes():
             if skip_first:
                 skip_first = False

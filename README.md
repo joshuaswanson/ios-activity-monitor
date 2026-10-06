@@ -40,11 +40,12 @@ uv sync
 The script:
 
 1. Checks that an iPhone/iPad is plugged in.
-2. Starts the `pymobiledevice3` tunnel daemon (will prompt for your Mac password once).
-3. Launches the dashboard.
-4. Opens it in your browser.
+2. Launches the dashboard.
+3. Opens it in your browser.
 
 Press **Ctrl+C** once to stop everything.
+
+USB mode needs no `sudo` and no tunnel daemon. The monitor opens the developer tunnel itself over the USB connection.
 
 ### WiFi mode (no cable)
 
@@ -52,7 +53,7 @@ Press **Ctrl+C** once to stop everything.
 ./start --wifi
 ```
 
-Once the device has been paired with this Mac over USB at least once, you can run the monitor without the cable plugged in. Requirements:
+Once the device has been paired with this Mac over USB at least once, you can run the monitor without the cable plugged in. WiFi mode uses the `pymobiledevice3` tunnel daemon, which `./start --wifi` launches for you (it will prompt for your Mac password once). Requirements:
 
 - Phone is on the same WiFi network as this Mac.
 - Developer Mode is on, phone is unlocked, screen on.
@@ -60,26 +61,34 @@ Once the device has been paired with this Mac over USB at least once, you can ru
 
 There are caveats. It's slower and less reliable than USB, and the phone going to sleep will drop the stream. The dashboard reconnects automatically when the device comes back. Bluetooth alone is not supported. The developer tunnel runs over TCP/QUIC on the local network.
 
-### VPN caveat
+### VPNs
 
-iOS 17+ developer services tunnel over a per-session IPv6 ULA address (`fd00::/8`), even when you're on a cable. If you're on a corporate / "always-on" VPN that uses macOS's Network Extension framework (Cisco AnyConnect, GlobalProtect, etc.), it will silently route the tunnel traffic out the VPN and the dashboard will never see any data.
+iOS 17+ developer services tunnel over a per-session IPv6 ULA address (`fd00::/8`), even when you're on a cable. A corporate / "always-on" VPN that uses macOS's Network Extension framework (Cisco AnyConnect, GlobalProtect, etc.) captures that traffic when it goes through a `utun` interface. Route-table fixes don't help because Network Extension policies override the routing table at the socket layer.
 
-To work around this, disconnect from the VPN while you're using the monitor. Route-table fixes don't help because Network Extension policies override the routing table at the socket layer.
+USB mode works with such a VPN connected. The monitor builds the tunnel's IPv6/TCP packets in its own process and exchanges them with the device over `usbmuxd`, so the traffic never enters the Mac's network stack.
+
+WiFi mode and `--rsd` still use a `utun` interface. Disconnect from the VPN while you use them.
 
 ### Manual / advanced
 
-If you prefer to run the pieces separately:
+To run the monitor without the launcher script:
+
+```bash
+uv run ios-activity-monitor --web        # dashboard
+uv run ios-activity-monitor              # terminal TUI
+```
+
+For WiFi mode, run the tunnel daemon in one terminal and the monitor in another:
 
 ```bash
 # terminal 1 (leave running)
 sudo uv run pymobiledevice3 remote tunneld
 
 # terminal 2
-uv run ios-activity-monitor --web        # dashboard
-uv run ios-activity-monitor              # terminal TUI
+uv run ios-activity-monitor --web --wifi
 ```
 
-If you don't want to run the daemon at all, you can use a one-shot tunnel and pass its address through:
+You can also use a one-shot `pymobiledevice3` tunnel and pass its address through:
 
 ```bash
 sudo uv run pymobiledevice3 lockdown start-tunnel

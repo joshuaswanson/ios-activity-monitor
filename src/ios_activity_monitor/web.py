@@ -105,6 +105,7 @@ class SampleHub:
                     self.target,
                     interval_ms=self.interval_ms,
                     rsd_address=self.rsd_address,
+                    wifi=self.wifi,
                 ):
                     if self._pending_interval_ms is not None:
                         self.interval_ms = self._pending_interval_ms

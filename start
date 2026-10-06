@@ -6,11 +6,13 @@
 #         ./start --wifi     # discover device over WiFi via tunneld
 #
 # What it does:
-#   1. Checks if the pymobiledevice3 `tunneld` daemon is running on 127.0.0.1:49151.
-#   2. If not, starts it with sudo and waits for it to be ready (prompts for your
-#      Mac password once; will not re-prompt while the script is running).
-#   3. Launches the web dashboard.
-#   4. Opens it in your default browser.
+#   1. Checks that a device is plugged in (USB mode).
+#   2. Launches the web dashboard.
+#   3. Opens it in your default browser.
+#
+# WiFi mode also needs the pymobiledevice3 `tunneld` daemon on 127.0.0.1:49151.
+# If it is not running, the script starts it with sudo and waits for it to be
+# ready (prompts for your Mac password once).
 #
 # WiFi mode requires:
 #   - The phone has been paired with this Mac over USB at least once.
@@ -26,7 +28,7 @@ for arg in "$@"; do
     case "$arg" in
         --wifi) WIFI=1 ;;
         -h|--help)
-            sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -90,36 +92,38 @@ elif ! phone_connected; then
 fi
 
 # ── tunneld ─────────────────────────────────────────────────────────
-if tunneld_up; then
-    green "✓ tunneld already running at ${TUNNELD_HOST}:${TUNNELD_PORT}"
-else
-    cyan "starting tunneld (needs sudo)…"
-    # cache sudo creds up front so the background launch doesn't prompt later
-    sudo -v
-    sudo uv run --project "$PROJECT_DIR" pymobiledevice3 remote tunneld \
-        >/tmp/iam-tunneld.log 2>&1 &
-    TUNNELD_PID=$!
-    WE_STARTED_TUNNELD=1
+if [[ "$WIFI" -eq 1 ]]; then
+    if tunneld_up; then
+        green "✓ tunneld already running at ${TUNNELD_HOST}:${TUNNELD_PORT}"
+    else
+        cyan "starting tunneld (needs sudo)…"
+        # cache sudo creds up front so the background launch doesn't prompt later
+        sudo -v
+        sudo uv run --project "$PROJECT_DIR" pymobiledevice3 remote tunneld \
+            >/tmp/iam-tunneld.log 2>&1 &
+        TUNNELD_PID=$!
+        WE_STARTED_TUNNELD=1
 
-    # wait for it to come up (up to ~15s)
-    for i in $(seq 1 30); do
-        sleep 0.5
-        if tunneld_up; then
-            green "✓ tunneld up after $(echo "$i * 0.5" | bc)s"
-            break
-        fi
-        if ! kill -0 "$TUNNELD_PID" 2>/dev/null; then
-            red "tunneld exited unexpectedly. last log lines:"
-            tail -n 10 /tmp/iam-tunneld.log || true
+        # wait for it to come up (up to ~15s)
+        for i in $(seq 1 30); do
+            sleep 0.5
+            if tunneld_up; then
+                green "✓ tunneld up after $(echo "$i * 0.5" | bc)s"
+                break
+            fi
+            if ! kill -0 "$TUNNELD_PID" 2>/dev/null; then
+                red "tunneld exited unexpectedly. last log lines:"
+                tail -n 10 /tmp/iam-tunneld.log || true
+                exit 1
+            fi
+        done
+
+        if ! tunneld_up; then
+            red "tunneld did not come up within 15s. log:"
+            tail -n 20 /tmp/iam-tunneld.log || true
+            cleanup
             exit 1
         fi
-    done
-
-    if ! tunneld_up; then
-        red "tunneld did not come up within 15s. log:"
-        tail -n 20 /tmp/iam-tunneld.log || true
-        cleanup
-        exit 1
     fi
 fi
 

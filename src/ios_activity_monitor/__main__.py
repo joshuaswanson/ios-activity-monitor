@@ -24,7 +24,7 @@ def main() -> int:
         nargs=2,
         metavar=("HOST", "PORT"),
         help=(
-            "Bypass tunneld and connect directly to an RSD address printed by "
+            "Connect directly to an RSD address printed by "
             "`pymobiledevice3 lockdown start-tunnel` (e.g. --rsd fd75::1 61947)."
         ),
     )
