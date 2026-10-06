@@ -80,12 +80,13 @@ uv run pymobiledevice3 amfi reveal-developer-mode
 
 The dashboard subscribes to the [`com.apple.instruments.server.services.sysmontap`](https://github.com/doronz88/pymobiledevice3) service on the device (the same one Xcode's Instruments uses for its "Activity Monitor" template) and broadcasts each snapshot to the browser over a WebSocket. The frontend is plain HTML/CSS/vanilla JS (no build step).
 
+Collecting the data uses CPU on the device, so `DTServiceHub`, `sysmond` and `remotepairingdeviced` appear near the top of the list while the monitor is running.
+
 Backend: FastAPI + uvicorn + pymobiledevice3 + (optionally) Textual for the TUI.
 
 ## Limitations
 
 - Process names are the BSD short names (≤16 chars). For full bundle IDs you'd need a separate lookup.
-- The data-collection services themselves (`DTServiceHub`, `sysmond`, `remotepairingdeviced`) will always appear in the top of _your_ list. Ignore them.
 - CPU% is per single core, so a multi-threaded process can exceed 100% (e.g. 250% means it's using ~2.5 cores).
 
 ## Support
