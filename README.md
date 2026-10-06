@@ -1,4 +1,9 @@
-# ios-activity-monitor
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-wordmark-dark.svg">
+    <img src="assets/logo-wordmark-light.svg" alt="iOS Activity Monitor" width="480">
+  </picture>
+</h1>
 
 A live process monitor for a USB-tethered iPhone or iPad. Like macOS Activity Monitor, but for iOS.
 

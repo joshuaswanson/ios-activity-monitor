@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="iOS Activity Monitor">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2926"/>
+      <stop offset="1" stop-color="#121211"/>
+    </linearGradient>
+    <linearGradient id="trace" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffc27a"/>
+      <stop offset="1" stop-color="#ff7a1a"/>
+    </linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff9a3c" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="screen">
+      <rect x="165" y="77" width="182" height="358" rx="36"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#background)"/>
+
+  <rect x="158" y="70" width="196" height="372" rx="43" fill="#191817" stroke="#f4f1ea" stroke-width="14"/>
+  <rect x="227" y="98" width="58" height="17" rx="8.5" fill="#f4f1ea"/>
+
+  <path d="M74 296 H134 M378 296 H438" fill="none" stroke="#ff9a3c" stroke-opacity="0.5" stroke-width="15" stroke-linecap="round"/>
+
+  <g clip-path="url(#screen)">
+    <path d="M165 296 H201 L222 262 L245 322 L276 178 L302 296 H347 V435 H165 Z" fill="url(#area)"/>
+    <path d="M165 296 H201 L222 262 L245 322 L276 178 L302 296 H347" fill="none" stroke="url(#trace)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
