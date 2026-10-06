@@ -61,14 +61,6 @@ Once the device has been paired with this Mac over USB at least once, you can ru
 
 There are caveats. It's slower and less reliable than USB, and the phone going to sleep will drop the stream. The dashboard reconnects automatically when the device comes back. Bluetooth alone is not supported. The developer tunnel runs over TCP/QUIC on the local network.
 
-### VPNs
-
-iOS 17+ developer services tunnel over a per-session IPv6 ULA address (`fd00::/8`), even when you're on a cable. A corporate / "always-on" VPN that uses macOS's Network Extension framework (Cisco AnyConnect, GlobalProtect, etc.) captures that traffic when it goes through a `utun` interface. Route-table fixes don't help because Network Extension policies override the routing table at the socket layer.
-
-USB mode works with such a VPN connected. The monitor builds the tunnel's IPv6/TCP packets in its own process and exchanges them with the device over `usbmuxd`, so the traffic never enters the Mac's network stack.
-
-WiFi mode and `--rsd` still use a `utun` interface. Disconnect from the VPN while you use them.
-
 ### Manual / advanced
 
 To run the monitor without the launcher script:
@@ -131,6 +123,7 @@ Backend: FastAPI + uvicorn + pymobiledevice3 + (optionally) Textual for the TUI.
 
 - Process names are the BSD short names (≤16 chars). For full bundle IDs you'd need a separate lookup.
 - The data-collection services themselves (`DTServiceHub`, `sysmond`, `remotepairingdeviced`) will always appear in the top of _your_ list. Ignore them.
+- WiFi mode and `--rsd` do not work while an always-on VPN built on macOS's Network Extension framework (Cisco AnyConnect, GlobalProtect, etc.) is connected. Use USB mode or disconnect the VPN.
 - CPU% is per single core, so a multi-threaded process can exceed 100% (e.g. 250% means it's using ~2.5 cores).
 
 ## Support
