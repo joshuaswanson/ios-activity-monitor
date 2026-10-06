@@ -5,17 +5,11 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator, Optional
 
-from pymobiledevice3.exceptions import TunneldConnectionError
 from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.remote.remote_service_discovery import RemoteServiceDiscoveryService
 from pymobiledevice3.services.diagnostics import DiagnosticsService
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
 from pymobiledevice3.services.dvt.instruments.sysmontap import Sysmontap
-from pymobiledevice3.tunneld.api import (
-    TUNNELD_DEFAULT_ADDRESS,
-    get_tunneld_device_by_udid,
-    get_tunneld_devices,
-)
 from pymobiledevice3.usbmux import list_devices
 
 from ios_activity_monitor.usb_tunnel import open_usb_tunnel
@@ -46,32 +40,17 @@ class NoDeviceError(RuntimeError):
     pass
 
 
-class NoTunnelError(RuntimeError):
-    pass
-
-
-async def discover_device(
-    preferred_udid: Optional[str] = None, wifi: bool = False
-) -> DeviceTarget:
-    if wifi:
-        return await _discover_via_tunneld(preferred_udid)
+async def discover_device(preferred_udid: Optional[str] = None) -> DeviceTarget:
     devices = await list_devices()
     if not devices:
-        try:
-            return await _discover_via_tunneld(preferred_udid)
-        except NoDeviceError:
-            raise NoDeviceError(
-                "No iOS device detected on USB or over the developer tunnel. "
-                "Plug it in (or, for WiFi mode, make sure tunneld has discovered it)."
-            )
+        raise NoDeviceError(
+            "No iOS device detected on USB. Plug it in, unlock it, and tap Trust if prompted."
+        )
     if preferred_udid is not None:
         for dev in devices:
             if dev.matches_udid(preferred_udid):
                 return await _to_target(dev.serial)
-        try:
-            return await _discover_via_tunneld(preferred_udid)
-        except NoDeviceError:
-            raise NoDeviceError(f"UDID {preferred_udid} is not connected.")
+        raise NoDeviceError(f"UDID {preferred_udid} is not connected.")
     return await _to_target(devices[0].serial)
 
 
@@ -91,97 +70,14 @@ async def _to_target(serial: str) -> DeviceTarget:
     )
 
 
-async def _discover_via_tunneld(preferred_udid: Optional[str]) -> DeviceTarget:
-    try:
-        if preferred_udid is not None:
-            rsd = await get_tunneld_device_by_udid(preferred_udid)
-            if rsd is None:
-                raise NoDeviceError(
-                    f"UDID {preferred_udid} not found in tunneld. "
-                    "Make sure tunneld is running and the device is reachable."
-                )
-        else:
-            devices = await get_tunneld_devices()
-            if not devices:
-                raise NoDeviceError(
-                    "tunneld is not tracking any devices. "
-                    "Make sure the phone is on the same WiFi network, "
-                    "Developer Mode is on, and you've paired it over USB at least once."
-                )
-            rsd = devices[0]
-    except TunneldConnectionError as exc:
-        raise NoDeviceError(
-            "tunneld is not running. Start it with: "
-            "sudo uv run pymobiledevice3 remote tunneld"
-        ) from exc
-    try:
-        return DeviceTarget(
-            udid=rsd.udid,
-            name=rsd.name or "iPhone",
-            product_type=rsd.product_type,
-            product_version=rsd.product_version,
-        )
-    finally:
-        close_result = rsd.close() if hasattr(rsd, "close") else None
-        if asyncio.iscoroutine(close_result):
-            await close_result
-
-
-async def _resolve_rsd(
-    udid: str, rsd_address: Optional[tuple[str, int]] = None
-) -> RemoteServiceDiscoveryService:
-    if rsd_address is not None:
-        rsd = RemoteServiceDiscoveryService(rsd_address)
-        await rsd.connect()
-        return rsd
-    try:
-        rsd = await get_tunneld_device_by_udid(udid)
-    except TunneldConnectionError as exc:
-        raise NoTunnelError(
-            "tunneld is not running. Either start the daemon with "
-            "`sudo uv run pymobiledevice3 remote tunneld`, "
-            "or pass --rsd HOST PORT from a manual `lockdown start-tunnel` session."
-        ) from exc
-    except IndexError as exc:
-        # pymobiledevice3 bug: get_tunneld_device_by_udid does rsds[0] without
-        # checking emptiness. Empty list means tunneld lists a tunnel for this
-        # UDID but rsd.connect() to its address failed, almost always a stale
-        # tunnel entry from a prior cable disconnect.
-        raise NoTunnelError(
-            f"tunneld has a stale tunnel for {udid}: the listed address is not "
-            "reachable. Unplug and replug the cable; if that doesn't heal it, "
-            "restart tunneld: "
-            "sudo pkill -f 'pymobiledevice3 remote tunneld' && ./start"
-        ) from exc
-    if rsd is not None:
-        return rsd
-    rsds = await get_tunneld_devices()
-    if rsds:
-        return rsds[0]
-    raise NoTunnelError(
-        "No tunnel found at "
-        f"{TUNNELD_DEFAULT_ADDRESS[0]}:{TUNNELD_DEFAULT_ADDRESS[1]}. "
-        "Start one with: sudo uv run pymobiledevice3 remote tunneld"
-    )
-
-
-async def _is_on_usbmux(udid: str) -> bool:
-    return any(dev.matches_udid(udid) for dev in await list_devices())
-
-
 @asynccontextmanager
-async def _open_rsd(
-    udid: str, rsd_address: Optional[tuple[str, int]], wifi: bool
-) -> AsyncIterator[RemoteServiceDiscoveryService]:
-    if rsd_address is None and not wifi and await _is_on_usbmux(udid):
-        async with open_usb_tunnel(udid) as tunnel:
-            rsd = await tunnel.connect_rsd()
-            try:
-                yield rsd
-            finally:
-                await rsd.close()
-        return
-    yield await _resolve_rsd(udid, rsd_address=rsd_address)
+async def _open_rsd(udid: str) -> AsyncIterator[RemoteServiceDiscoveryService]:
+    async with open_usb_tunnel(udid) as tunnel:
+        rsd = await tunnel.connect_rsd()
+        try:
+            yield rsd
+        finally:
+            await rsd.close()
 
 
 def _normalize(raw: dict) -> Optional[ProcessSample]:
@@ -207,12 +103,10 @@ def _normalize(raw: dict) -> Optional[ProcessSample]:
 async def stream_samples(
     target: DeviceTarget,
     interval_ms: int = 1000,
-    rsd_address: Optional[tuple[str, int]] = None,
-    wifi: bool = False,
 ) -> AsyncIterator[list[ProcessSample]]:
     skip_first = True
     async with (
-        _open_rsd(target.udid, rsd_address, wifi) as rsd,
+        _open_rsd(target.udid) as rsd,
         DvtProvider(rsd) as dvt,
         await Sysmontap.create(dvt, interval=interval_ms) as sysmon,
     ):
@@ -224,10 +118,8 @@ async def stream_samples(
             yield samples
 
 
-async def collect_one(
-    target: DeviceTarget, rsd_address: Optional[tuple[str, int]] = None
-) -> list[ProcessSample]:
-    async for samples in stream_samples(target, rsd_address=rsd_address):
+async def collect_one(target: DeviceTarget) -> list[ProcessSample]:
+    async for samples in stream_samples(target):
         return samples
     return []
 
@@ -241,39 +133,20 @@ class BatteryInfo:
     external_connected: Optional[bool]
 
 
-async def get_battery_info(
-    udid: str,
-    wifi: bool = False,
-    rsd_address: Optional[tuple[str, int]] = None,
-) -> BatteryInfo:
-    if wifi or rsd_address is not None:
-        rsd = await _resolve_rsd(udid, rsd_address=rsd_address)
+async def get_battery_info(udid: str) -> BatteryInfo:
+    client = await create_using_usbmux(serial=udid)
+    try:
+        svc = DiagnosticsService(client)
         try:
-            svc = DiagnosticsService(rsd)
-            try:
-                data = await svc.get_battery() or {}
-            finally:
-                close_result = svc.close() if hasattr(svc, "close") else None
-                if asyncio.iscoroutine(close_result):
-                    await close_result
+            data = await svc.get_battery() or {}
         finally:
-            close_result = rsd.close() if hasattr(rsd, "close") else None
+            close_result = svc.close() if hasattr(svc, "close") else None
             if asyncio.iscoroutine(close_result):
                 await close_result
-    else:
-        client = await create_using_usbmux(serial=udid)
-        try:
-            svc = DiagnosticsService(client)
-            try:
-                data = await svc.get_battery() or {}
-            finally:
-                close_result = svc.close() if hasattr(svc, "close") else None
-                if asyncio.iscoroutine(close_result):
-                    await close_result
-        finally:
-            close_result = client.close()
-            if asyncio.iscoroutine(close_result):
-                await close_result
+    finally:
+        close_result = client.close()
+        if asyncio.iscoroutine(close_result):
+            await close_result
 
     def _to_c(raw):
         if raw is None:

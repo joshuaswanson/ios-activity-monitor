@@ -12,7 +12,6 @@ from textual.widgets import DataTable, Footer, Static
 from ios_activity_monitor.sysmon import (
     DeviceTarget,
     NoDeviceError,
-    NoTunnelError,
     ProcessSample,
     discover_device,
     stream_samples,
@@ -54,12 +53,10 @@ class ActivityMonitorApp(App):
         self,
         target: DeviceTarget,
         interval_ms: int = 1000,
-        rsd_address: Optional[tuple[str, int]] = None,
     ) -> None:
         super().__init__()
         self.target = target
         self.interval_ms = interval_ms
-        self.rsd_address = rsd_address
         self.sort_mode = SORT_MODES["c"]
         self.latest_samples: list[ProcessSample] = []
         self._stream_task: Optional[asyncio.Task] = None
@@ -85,14 +82,10 @@ class ActivityMonitorApp(App):
     async def _consume_stream(self) -> None:
         status = self.query_one("#status", Static)
         try:
-            async for samples in stream_samples(
-                self.target, interval_ms=self.interval_ms, rsd_address=self.rsd_address
-            ):
+            async for samples in stream_samples(self.target, interval_ms=self.interval_ms):
                 self.latest_samples = samples
                 self._render()
                 status.update(f" {len(samples)} processes · refreshing every {self.interval_ms}ms")
-        except NoTunnelError as exc:
-            status.update(f" {exc}")
         except NoDeviceError as exc:
             status.update(f" {exc}")
         except asyncio.CancelledError:

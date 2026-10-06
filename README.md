@@ -45,21 +45,7 @@ The script:
 
 Press **Ctrl+C** once to stop everything.
 
-USB mode needs no `sudo` and no tunnel daemon. The monitor opens the developer tunnel itself over the USB connection.
-
-### WiFi mode (no cable)
-
-```bash
-./start --wifi
-```
-
-Once the device has been paired with this Mac over USB at least once, you can run the monitor without the cable plugged in. WiFi mode uses the `pymobiledevice3` tunnel daemon, which `./start --wifi` launches for you (it will prompt for your Mac password once). Requirements:
-
-- Phone is on the same WiFi network as this Mac.
-- Developer Mode is on, phone is unlocked, screen on.
-- The initial USB pairing has been done (so the trust record exists on this Mac).
-
-There are caveats. It's slower and less reliable than USB, and the phone going to sleep will drop the stream. The dashboard reconnects automatically when the device comes back. Bluetooth alone is not supported. The developer tunnel runs over TCP/QUIC on the local network.
+The monitor opens the developer tunnel itself over the USB connection and runs as your normal user.
 
 ### Manual / advanced
 
@@ -70,38 +56,15 @@ uv run ios-activity-monitor --web        # dashboard
 uv run ios-activity-monitor              # terminal TUI
 ```
 
-For WiFi mode, run the tunnel daemon in one terminal and the monitor in another:
-
-```bash
-# terminal 1 (leave running)
-sudo uv run pymobiledevice3 remote tunneld
-
-# terminal 2
-uv run ios-activity-monitor --web --wifi
-```
-
-You can also use a one-shot `pymobiledevice3` tunnel and pass its address through:
-
-```bash
-sudo uv run pymobiledevice3 lockdown start-tunnel
-# prints:  --rsd fd75:1790:bc47::1 61947
-
-uv run ios-activity-monitor --web --rsd fd75:1790:bc47::1 61947
-```
-
-The one-shot tunnel has two drawbacks. The address regenerates on every tunnel restart, and a USB interruption forces you to restart both the tunnel and the monitor.
-
 ### Options
 
-| Flag              | Default         | Description                                                      |
-| ----------------- | --------------- | ---------------------------------------------------------------- |
-| `--udid UDID`     | first connected | Target a specific device by UDID.                                |
-| `--interval MS`   | `1000`          | Sampling interval in milliseconds.                               |
-| `--web`           | off             | Launch the web dashboard instead of the TUI.                     |
-| `--host HOST`     | `127.0.0.1`     | Web bind host.                                                   |
-| `--port PORT`     | `8732`          | Web bind port.                                                   |
-| `--rsd HOST PORT` | (auto)          | Connect directly to an RSD address from `lockdown start-tunnel`. |
-| `--wifi`          | off             | Discover the device over WiFi via tunneld instead of USB.        |
+| Flag            | Default         | Description                                  |
+| --------------- | --------------- | -------------------------------------------- |
+| `--udid UDID`   | first connected | Target a specific device by UDID.            |
+| `--interval MS` | `1000`          | Sampling interval in milliseconds.           |
+| `--web`         | off             | Launch the web dashboard instead of the TUI. |
+| `--host HOST`   | `127.0.0.1`     | Web bind host.                               |
+| `--port PORT`   | `8732`          | Web bind port.                               |
 
 ### First-run setup on the iPhone
 
@@ -123,7 +86,6 @@ Backend: FastAPI + uvicorn + pymobiledevice3 + (optionally) Textual for the TUI.
 
 - Process names are the BSD short names (≤16 chars). For full bundle IDs you'd need a separate lookup.
 - The data-collection services themselves (`DTServiceHub`, `sysmond`, `remotepairingdeviced`) will always appear in the top of _your_ list. Ignore them.
-- WiFi mode and `--rsd` do not work while an always-on VPN built on macOS's Network Extension framework (Cisco AnyConnect, GlobalProtect, etc.) is connected. Use USB mode or disconnect the VPN.
 - CPU% is per single core, so a multi-threaded process can exceed 100% (e.g. 250% means it's using ~2.5 cores).
 
 ## Support

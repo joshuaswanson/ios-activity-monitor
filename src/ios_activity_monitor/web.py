@@ -41,14 +41,10 @@ class SampleHub:
     def __init__(
         self,
         target: DeviceTarget,
-        rsd_address: Optional[tuple[str, int]] = None,
         interval_ms: int = 1000,
-        wifi: bool = False,
     ) -> None:
         self.target = target
-        self.rsd_address = rsd_address
         self.interval_ms = interval_ms
-        self.wifi = wifi
         self.subscribers: set[asyncio.Queue] = set()
         self._task: Optional[asyncio.Task] = None
         self._battery_task: Optional[asyncio.Task] = None
@@ -104,8 +100,6 @@ class SampleHub:
                 async for samples in stream_samples(
                     self.target,
                     interval_ms=self.interval_ms,
-                    rsd_address=self.rsd_address,
-                    wifi=self.wifi,
                 ):
                     if self._pending_interval_ms is not None:
                         self.interval_ms = self._pending_interval_ms
@@ -154,11 +148,7 @@ class SampleHub:
     async def _battery_loop(self) -> None:
         while True:
             try:
-                self._battery = await get_battery_info(
-                    self.target.udid,
-                    wifi=self.wifi,
-                    rsd_address=self.rsd_address,
-                )
+                self._battery = await get_battery_info(self.target.udid)
                 if self._latest is not None:
                     self._latest["battery"] = asdict(self._battery)
                     self._broadcast({"type": "battery", "battery": asdict(self._battery)})
@@ -181,16 +171,9 @@ class SampleHub:
 
 def make_app(
     target: DeviceTarget,
-    rsd_address: Optional[tuple[str, int]] = None,
     interval_ms: int = 1000,
-    wifi: bool = False,
 ) -> FastAPI:
-    hub = SampleHub(
-        target=target,
-        rsd_address=rsd_address,
-        interval_ms=interval_ms,
-        wifi=wifi,
-    )
+    hub = SampleHub(target=target, interval_ms=interval_ms)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
