@@ -13,14 +13,6 @@ Streams per-process CPU, memory and thread counts from the device in real time o
 
 Useful when your iPhone is running hot and you want to know why.
 
-## Features
-
-- Live process list with CPU%, resident memory, thread count (updates every second).
-- Sortable columns, with a sparkline trend per row over the last 30 seconds.
-- Hover any process for a plain-English description of what it does, and, if it's running hot, an explanation of what that usually means.
-- iOS marketing name lookup (so `iPhone14,3` shows as "iPhone 13 Pro Max").
-- Terminal TUI mode if you don't want the web UI.
-
 ## Requirements
 
 - macOS (Linux probably works for the data layer but the install instructions below assume macOS).
