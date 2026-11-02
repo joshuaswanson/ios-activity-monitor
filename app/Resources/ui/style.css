@@ -387,3 +387,43 @@ footer kbd {
   color: var(--text-dim);
   margin: 0 1px;
 }
+
+/* ───── native window ───── */
+html {
+  overscroll-behavior: none;
+}
+body {
+  -webkit-user-select: none;
+  cursor: default;
+}
+.battery.no-temp .battery-temp {
+  display: none;
+}
+.empty {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 14vh 24px 0;
+  text-align: center;
+}
+.empty img {
+  margin-bottom: 18px;
+}
+.empty h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.empty p {
+  margin: 0;
+  max-width: 400px;
+  color: var(--text-dim);
+}
+.waiting .empty {
+  display: flex;
+}
+.waiting .table-wrap,
+.waiting footer {
+  display: none;
+}

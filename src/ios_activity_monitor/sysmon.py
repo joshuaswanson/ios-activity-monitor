@@ -3,16 +3,21 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, Awaitable, Callable, Optional
 
+from pymobiledevice3.exceptions import AlreadyMountedError, PasswordRequiredError, PyMobileDevice3Exception
 from pymobiledevice3.lockdown import create_using_usbmux
 from pymobiledevice3.remote.remote_service_discovery import RemoteServiceDiscoveryService
+from pymobiledevice3.services.amfi import AmfiService
 from pymobiledevice3.services.diagnostics import DiagnosticsService
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
 from pymobiledevice3.services.dvt.instruments.sysmontap import Sysmontap
+from pymobiledevice3.services.mobile_image_mounter import PersonalizedImageMounter, auto_mount
 from pymobiledevice3.usbmux import list_devices
 
 from ios_activity_monitor.usb_tunnel import open_usb_tunnel
+
+DEVELOPER_IMAGE_MOUNT_PATH = "/System/Developer"
 
 
 @dataclass(slots=True)
@@ -36,34 +41,56 @@ class DeviceTarget:
     product_version: str
 
 
-class NoDeviceError(RuntimeError):
+class DeveloperModeDisabledError(RuntimeError):
     pass
 
 
-async def discover_device(preferred_udid: Optional[str] = None) -> DeviceTarget:
-    devices = await list_devices()
-    if not devices:
-        raise NoDeviceError(
-            "No iOS device detected on USB. Plug it in, unlock it, and tap Trust if prompted."
-        )
-    if preferred_udid is not None:
-        for dev in devices:
-            if dev.matches_udid(preferred_udid):
-                return await _to_target(dev.serial)
-        raise NoDeviceError(f"UDID {preferred_udid} is not connected.")
-    return await _to_target(devices[0].serial)
+async def first_usb_device() -> Optional[str]:
+    return next((dev.serial for dev in await list_devices() if dev.is_usb), None)
 
 
-async def _to_target(serial: str) -> DeviceTarget:
-    client = await create_using_usbmux(serial=serial)
+async def _close(client) -> None:
+    close_result = client.close()
+    if asyncio.iscoroutine(close_result):
+        await close_result
+
+
+async def _developer_image_mounted(client) -> bool:
+    # iOS 27 serves the image from a system cryptex, which LookupImage does not report.
+    mounted = await PersonalizedImageMounter(client).copy_devices()
+    return any(entry.get("MountPath") == DEVELOPER_IMAGE_MOUNT_PATH for entry in mounted)
+
+
+async def _mount_developer_image(client) -> None:
     try:
+        await auto_mount(client)
+    except AlreadyMountedError:
+        pass
+    except PyMobileDevice3Exception as exc:
+        if "DeviceLocked" in str(exc):
+            raise PasswordRequiredError() from exc
+        raise
+
+
+async def prepare_device(udid: str, on_step: Callable[[str], Awaitable[None]]) -> DeviceTarget:
+    """Pair with the device and mount the developer image if either is missing."""
+    client = await create_using_usbmux(serial=udid, connection_type="USB", autopair=False)
+    if not client.paired:
+        await _close(client)
+        await on_step("trust")
+        client = await create_using_usbmux(serial=udid, connection_type="USB")
+    try:
+        if not await client.get_developer_mode_status():
+            await AmfiService(client).reveal_developer_mode_option_in_ui()
+            raise DeveloperModeDisabledError()
+        if not await _developer_image_mounted(client):
+            await on_step("mounting")
+            await _mount_developer_image(client)
         info = client.all_values
     finally:
-        close_result = client.close()
-        if asyncio.iscoroutine(close_result):
-            await close_result
+        await _close(client)
     return DeviceTarget(
-        udid=serial,
+        udid=udid,
         name=info.get("DeviceName", "iPhone"),
         product_type=info.get("ProductType", ""),
         product_version=info.get("ProductVersion", ""),
@@ -118,12 +145,6 @@ async def stream_samples(
             yield samples
 
 
-async def collect_one(target: DeviceTarget) -> list[ProcessSample]:
-    async for samples in stream_samples(target):
-        return samples
-    return []
-
-
 @dataclass(slots=True)
 class BatteryInfo:
     temp_c: Optional[float]
@@ -134,7 +155,7 @@ class BatteryInfo:
 
 
 async def get_battery_info(udid: str) -> BatteryInfo:
-    client = await create_using_usbmux(serial=udid)
+    client = await create_using_usbmux(serial=udid, connection_type="USB")
     try:
         svc = DiagnosticsService(client)
         try:
@@ -144,9 +165,7 @@ async def get_battery_info(udid: str) -> BatteryInfo:
             if asyncio.iscoroutine(close_result):
                 await close_result
     finally:
-        close_result = client.close()
-        if asyncio.iscoroutine(close_result):
-            await close_result
+        await _close(client)
 
     def _to_c(raw):
         if raw is None:
@@ -163,15 +182,3 @@ async def get_battery_info(udid: str) -> BatteryInfo:
         is_charging=data.get("IsCharging"),
         external_connected=data.get("ExternalConnected"),
     )
-
-
-if __name__ == "__main__":
-    async def _main() -> None:
-        target = await discover_device()
-        print(f"{target.name} ({target.product_type}, iOS {target.product_version})")
-        samples = await collect_one(target)
-        samples.sort(key=lambda s: s.cpu, reverse=True)
-        for s in samples[:15]:
-            print(f"{s.pid:>6}  {s.cpu:>5.1f}%  {s.rss_mb:>7.1f}MB  {s.threads:>3}  {s.name}")
-
-    asyncio.run(_main())

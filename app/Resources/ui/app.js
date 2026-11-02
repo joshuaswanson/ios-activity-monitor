@@ -1,5 +1,5 @@
-// ios-activity-monitor frontend
-// minimal dev-tool dashboard with hover-to-explain
+// iOS Activity Monitor window contents, with hover-to-explain.
+// The app delivers engine events through window.onEngineEvent.
 
 const MAX_VISIBLE = 40;
 const SPARK_LEN = 30;
@@ -75,11 +75,10 @@ if (rateSelect) {
 }
 
 // ─── sample-rate control ────────────────────────────────────────────
-let activeWS = null;
+const engine = window.webkit.messageHandlers.engine;
+
 function sendSampleInterval(ms) {
-  if (activeWS && activeWS.readyState === WebSocket.OPEN) {
-    activeWS.send(JSON.stringify({ cmd: "set_sample_interval", ms }));
-  }
+  engine.postMessage({ cmd: "set_sample_interval", ms });
 }
 
 const sampleSelect = document.getElementById("sample-rate");
@@ -100,53 +99,102 @@ if (sampleSelect) {
   });
 }
 
-// ─── ws connection ───────────────────────────────────────────────────
-function connect() {
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  const ws = new WebSocket(`${proto}//${location.host}/ws`);
-  activeWS = ws;
-  setStatus("connecting", "connecting…");
+// ─── engine events ──────────────────────────────────────────────────
+const CONNECTION_STATES = {
+  no_device: {
+    status: "connecting",
+    label: "no device",
+    title: "Connect your iPhone",
+    message: "Plug in an iPhone or iPad with a USB cable.",
+  },
+  connecting: {
+    status: "connecting",
+    label: "connecting…",
+    title: "Connecting",
+    message: "Starting a session with your device.",
+  },
+  trust: {
+    status: "connecting",
+    label: "waiting for trust",
+    title: "Trust this Mac",
+    message: "Unlock your device and tap Trust when it asks.",
+  },
+  locked: {
+    status: "connecting",
+    label: "device locked",
+    title: "Unlock your device",
+    message: "iOS needs the device unlocked to finish setting up. Keep it awake for a moment.",
+  },
+  developer_mode: {
+    status: "error",
+    label: "developer mode off",
+    title: "Turn on Developer Mode",
+    message:
+      "On your device, open Settings, then Privacy & Security, then Developer Mode. Turn it on and restart when asked.",
+  },
+  mounting: {
+    status: "connecting",
+    label: "preparing device…",
+    title: "Preparing your device",
+    message: "Installing Apple's developer disk image. Keep your device unlocked. This can take a minute.",
+  },
+};
 
-  ws.addEventListener("open", () => {
-    setStatus("live", "live");
-    // push the persisted sample interval on (re)connect
-    if (sampleSelect) {
-      const ms = parseInt(sampleSelect.value, 10);
-      if (Number.isFinite(ms) && ms > 0) sendSampleInterval(ms);
-    }
-  });
-  ws.addEventListener("message", (ev) => {
-    let payload;
-    try {
-      payload = JSON.parse(ev.data);
-    } catch {
-      return;
-    }
-    if (payload.type === "error") {
-      setStatus("error", payload.message || "stream error");
-      return;
-    }
-    if (payload.type === "battery") {
-      renderBattery(payload.battery);
-      return;
-    }
-    if (payload.type !== "tick") return;
-    window.__lastPayload = payload;
-    accumulateHistory(payload);
-    const now = performance.now();
-    if (now - state.lastRenderAt >= state.uiIntervalMs) {
-      state.lastRenderAt = now;
-      render(payload);
-    }
-    setStatus("live", "live");
-  });
-  ws.addEventListener("close", () => {
-    setStatus("connecting", "reconnecting…");
-    setTimeout(connect, 1500);
-  });
-  ws.addEventListener("error", () => setStatus("error", "socket error"));
+window.onEngineEvent = (payload) => {
+  if (payload.type === "status") {
+    renderConnection(payload);
+    return;
+  }
+  if (payload.type === "battery") {
+    renderBattery(payload.battery);
+    return;
+  }
+  if (payload.type !== "tick") return;
+  document.body.classList.remove("waiting");
+  window.__lastPayload = payload;
+  accumulateHistory(payload);
+  const now = performance.now();
+  if (now - state.lastRenderAt >= state.uiIntervalMs) {
+    state.lastRenderAt = now;
+    render(payload);
+  }
+  setStatus("live", "live");
+};
+
+function renderConnection({ state: connection, message }) {
+  const info = CONNECTION_STATES[connection] ?? {
+    status: "error",
+    label: "error",
+    title: "Can't read from your device",
+    message,
+  };
+  setStatus(info.status, info.label);
+  bind("empty-title").textContent = info.title;
+  bind("empty-message").textContent = info.message;
+  if (connection === "no_device") clearDevice();
 }
-connect();
+
+function clearDevice() {
+  document.body.classList.add("waiting");
+  window.__lastPayload = null;
+  state.history.clear();
+  state.lastRenderAt = -Infinity;
+  bind("rows").replaceChildren();
+  for (const key of [
+    "device-name",
+    "device-product",
+    "device-ios",
+    "process-count",
+    "aggregate-cpu",
+    "rss-total",
+  ]) {
+    bind(key).textContent = "—";
+  }
+  renderBattery(null);
+}
+
+const initialInterval = parseInt(sampleSelect?.value ?? "", 10);
+engine.postMessage({ cmd: "start", ms: initialInterval });
 
 function setStatus(status, text) {
   document.querySelector(".dot").dataset.status = status;
@@ -158,10 +206,15 @@ function renderBattery(b) {
   const wrap = document.querySelector(".battery");
   if (!wrap) return;
   wrap.classList.remove("warm", "hot");
-  if (!b || b.temp_c == null) {
-    bind("battery-temp").textContent = "—";
+  bind("battery-charge").textContent =
+    b?.level_pct != null
+      ? `${b.level_pct}%${b.is_charging ? " charging" : ""}`
+      : "";
+  const hasTemp = b?.temp_c != null;
+  wrap.classList.toggle("no-temp", !hasTemp);
+  if (!hasTemp) {
+    bind("battery-temp").textContent = "";
     bind("battery-state").textContent = "";
-    bind("battery-charge").textContent = "";
     return;
   }
   const t = b.temp_c;
@@ -179,11 +232,6 @@ function renderBattery(b) {
   }
   bind("battery-temp").textContent = t.toFixed(1);
   bind("battery-state").textContent = label;
-  const charge =
-    b.level_pct != null
-      ? `${b.level_pct}%${b.is_charging ? " charging" : ""}`
-      : "";
-  bind("battery-charge").textContent = charge;
 }
 
 // ─── history (accumulated every tick, even when not rendering) ─────

@@ -4,15 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>iOS Activity Monitor</title>
-    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
+  <body class="waiting">
     <header class="bar">
       <h1>iOS Activity Monitor</h1>
       <div class="bar-right">
         <label
           class="rate-select"
-          title="How often the dashboard repaints. Backend keeps sampling at the rate below; the UI just throttles re-renders so values aren't jittery."
+          title="How often the table repaints. Sampling continues at the rate below, so values aren't jittery."
         >
           <span>UI</span>
           <select id="ui-rate">
@@ -59,10 +59,16 @@
       <span class="sep">·</span>
       <span class="battery" data-bind="battery-wrap">
         battery
-        <span data-bind="battery-temp">—</span>°C
+        <span class="battery-temp"><span data-bind="battery-temp">—</span>°C</span>
         <span class="battery-state" data-bind="battery-state"></span>
         <span class="battery-charge" data-bind="battery-charge"></span>
       </span>
+    </section>
+
+    <section class="empty">
+      <img src="logo.svg" alt="" width="84" height="84" />
+      <h2 data-bind="empty-title">Connecting</h2>
+      <p data-bind="empty-message">Starting a session with your device.</p>
     </section>
 
     <section class="table-wrap">
@@ -94,8 +100,8 @@
       <span>refresh <span data-bind="rate">—</span> ms</span>
     </footer>
 
-    <script src="/static/devices.js"></script>
-    <script src="/static/processes.js"></script>
-    <script src="/static/app.js" type="module"></script>
+    <script src="devices.js"></script>
+    <script src="processes.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>

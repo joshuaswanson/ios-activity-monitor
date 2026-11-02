@@ -5,86 +5,47 @@
   </picture>
 </h1>
 
-A live process monitor for a USB-tethered iPhone or iPad. Like macOS Activity Monitor, but for iOS.
+A live process monitor for an iPhone or iPad connected over USB. Like macOS Activity Monitor, but for iOS.
 
 ![screenshot](assets/screenshot.png)
 
-Streams per-process CPU, memory and thread counts from the device in real time over the [`pymobiledevice3`](https://github.com/doronz88/pymobiledevice3) developer tunnel, and renders them in a web dashboard with hover-to-explain tooltips for common iOS daemons.
+A standalone Mac app that streams per-process CPU, memory and thread counts from the device in real time, with hover-to-explain tooltips for common iOS daemons.
 
 Useful when your iPhone is running hot and you want to know why.
 
 ## Requirements
 
-- macOS (Linux probably works for the data layer but the install instructions below assume macOS).
-- An iPhone or iPad running iOS 17+ with **Developer Mode enabled** (`Settings → Privacy & Security → Developer Mode`).
-- The device must be connected via USB and trusted.
-- [`uv`](https://docs.astral.sh/uv/) (Python package manager).
+- A Mac with Apple silicon, running macOS 15 or later.
+- An iPhone or iPad running iOS 17.4 or later, connected over USB.
 
-## Install
+The first time you connect a device, the app walks you through tapping Trust and turning on Developer Mode. It needs no `sudo` and no other software.
+
+## Build
+
+Building needs Xcode, [`uv`](https://docs.astral.sh/uv/), and `librsvg` (`brew install librsvg`).
 
 ```bash
 git clone https://github.com/joshuaswanson/ios-activity-monitor.git
 cd ios-activity-monitor
-uv sync
+scripts/build-app.sh
 ```
 
-## Usage
-
-```bash
-./start
-```
-
-The script:
-
-1. Checks that an iPhone/iPad is plugged in.
-2. Launches the dashboard.
-3. Opens it in your browser.
-
-Press **Ctrl+C** once to stop everything.
-
-The monitor opens the developer tunnel itself over the USB connection and runs as your normal user.
-
-### Manual / advanced
-
-To run the monitor without the launcher script:
-
-```bash
-uv run ios-activity-monitor --web        # dashboard
-uv run ios-activity-monitor              # terminal TUI
-```
-
-### Options
-
-| Flag            | Default         | Description                                  |
-| --------------- | --------------- | -------------------------------------------- |
-| `--udid UDID`   | first connected | Target a specific device by UDID.            |
-| `--interval MS` | `1000`          | Sampling interval in milliseconds.           |
-| `--web`         | off             | Launch the web dashboard instead of the TUI. |
-| `--host HOST`   | `127.0.0.1`     | Web bind host.                               |
-| `--port PORT`   | `8732`          | Web bind port.                               |
-
-### First-run setup on the iPhone
-
-If "Developer Mode" doesn't appear in `Settings → Privacy & Security`, run:
-
-```bash
-uv run pymobiledevice3 amfi reveal-developer-mode
-```
-
-…and then the menu item will appear and you can toggle it on (it requires a restart).
+This produces `build/iOS Activity Monitor.app`. Drag it to `/Applications`.
 
 ## How it works
 
-The dashboard subscribes to the [`com.apple.instruments.server.services.sysmontap`](https://github.com/doronz88/pymobiledevice3) service on the device (the same one Xcode's Instruments uses for its "Activity Monitor" template) and broadcasts each snapshot to the browser over a WebSocket. The frontend is plain HTML/CSS/vanilla JS (no build step).
+The app subscribes to the [`com.apple.instruments.server.services.sysmontap`](https://github.com/doronz88/pymobiledevice3) service on the device, the same one Xcode's Instruments uses for its "Activity Monitor" template.
+
+The app has two parts inside its bundle:
+
+- A native window that shows the interface in `app/Resources/ui`. The files load directly from the bundle.
+- A private Python runtime that runs the device engine in `src/ios_activity_monitor`, built on `pymobiledevice3`. The window starts it and exchanges JSON with it over a pipe. It exits when the app quits.
+
+The engine opens the developer tunnel itself and carries it over the USB connection, so it runs as your normal user.
 
 Collecting the data uses CPU on the device, so `DTServiceHub`, `sysmond` and `remotepairingdeviced` appear near the top of the list while the monitor is running.
 
-Backend: FastAPI + uvicorn + pymobiledevice3 + (optionally) Textual for the TUI.
-
-## Limitations
-
-- Process names are the BSD short names (≤16 chars). For full bundle IDs you'd need a separate lookup.
-- CPU% is per single core, so a multi-threaded process can exceed 100% (e.g. 250% means it's using ~2.5 cores).
+Engine logs are in `~/Library/Logs/iOS Activity Monitor/engine.log`.
 
 ## Support
 

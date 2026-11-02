@@ -361,7 +361,7 @@ class UsbTunnel:
 
 @asynccontextmanager
 async def open_usb_tunnel(udid: str) -> AsyncIterator[UsbTunnel]:
-    lockdown = await create_using_usbmux(serial=udid)
+    lockdown = await create_using_usbmux(serial=udid, connection_type="USB")
     try:
         service = await lockdown.start_lockdown_service(CoreDeviceTunnelProxy.SERVICE_NAME)
         tunnel = UsbTunnel(service, await RemotePairingTcpTunnel(service=service).request_tunnel_establish())
