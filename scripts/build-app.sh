@@ -70,6 +70,25 @@ build_engine() {
     "$ENGINE/bin/python$PYTHON_VERSION" -I -m compileall -q -j 0 "$stdlib" >/dev/null
 }
 
+collect_licenses() {
+    local licenses="$RESOURCES/Licenses" site_packages="$ENGINE/lib/python$PYTHON_VERSION/site-packages"
+    mkdir -p "$licenses"
+    cp "$ROOT/LICENSE" "$licenses/iOS Activity Monitor.txt"
+    cp "$ENGINE/lib/python$PYTHON_VERSION/LICENSE.txt" "$licenses/Python.txt"
+    for dist_info in "$site_packages"/*.dist-info; do
+        local name
+        name="$(basename "$dist_info" .dist-info)"
+        mkdir -p "$licenses/$name"
+        find "$dist_info" -type f \( -iname 'licen[cs]e*' -o -iname 'copying*' -o -iname 'notice*' \) \
+            -exec cp {} "$licenses/$name/" \;
+        if [[ -z "$(ls -A "$licenses/$name")" ]]; then
+            # Some wheels ship no license file, so record the license their metadata declares.
+            grep -E '^(Name|Version|License|License-Expression|Home-page|Project-URL):|^Classifier: License ::' \
+                "$dist_info/METADATA" > "$licenses/$name/LICENSE-METADATA.txt"
+        fi
+    done
+}
+
 sign() {
     local identity log
     identity="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development|Developer ID Application/ {print $2; exit}')}"
@@ -89,6 +108,7 @@ mkdir -p "$RESOURCES"
 build_swift
 build_icon
 build_engine
+collect_licenses
 sign
 du -sh "$APP"
 echo "built $APP"

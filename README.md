@@ -63,4 +63,4 @@ If you find this useful, [buy me a coffee](https://buymeacoffee.com/swanson).
 
 ## License
 
-MIT.
+GPL-3.0-or-later. See [LICENSE](LICENSE). The app bundles [`pymobiledevice3`](https://github.com/doronz88/pymobiledevice3), which uses the same license. The license texts of every bundled component are in `Contents/Resources/Licenses` inside the app.
