@@ -13,6 +13,12 @@ A standalone Mac app that streams per-process CPU, memory and thread counts from
 
 Useful when your iPhone is running hot and you want to know why.
 
+## Install
+
+Download the `.dmg` from the [latest release](https://github.com/joshuaswanson/ios-activity-monitor/releases/latest), open it, and drag iOS Activity Monitor into Applications.
+
+The app is not notarized, so macOS blocks it the first time you open it. Open System Settings, go to Privacy & Security, and click Open Anyway next to the message about iOS Activity Monitor.
+
 ## Requirements
 
 - A Mac with Apple silicon, running macOS 15 or later.
@@ -20,7 +26,7 @@ Useful when your iPhone is running hot and you want to know why.
 
 The first time you connect a device, the app walks you through tapping Trust and turning on Developer Mode. It needs no `sudo` and no other software.
 
-## Build
+## Build from source
 
 Building needs Xcode, [`uv`](https://docs.astral.sh/uv/), and `librsvg` (`brew install librsvg`).
 
@@ -31,6 +37,8 @@ scripts/build-app.sh
 ```
 
 This produces `build/iOS Activity Monitor.app`. Drag it to `/Applications`.
+
+`scripts/package-dmg.sh` builds the app and packages it as the `.dmg` that goes on the releases page.
 
 ## How it works
 

@@ -5,6 +5,9 @@
 #
 # Needs Xcode, uv, and librsvg (brew install librsvg).
 #
+# Signs with your Apple Development or Developer ID identity when one exists.
+# Set SIGN_IDENTITY to override it, for example SIGN_IDENTITY=- for ad-hoc.
+#
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -69,7 +72,7 @@ build_engine() {
 
 sign() {
     local identity log
-    identity="$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development|Developer ID Application/ {print $2; exit}')"
+    identity="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development|Developer ID Application/ {print $2; exit}')}"
     identity="${identity:--}"
     log="$(mktemp)"
     find "$ENGINE" -type f \( -name '*.so' -o -name '*.dylib' -o -name "python$PYTHON_VERSION" \) -print0 \
