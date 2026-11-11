@@ -16,9 +16,12 @@
       <clipPath id="screen">
         <rect x="165" y="77" width="182" height="358" rx="36"/>
       </clipPath>
+      <filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">
+        <feDropShadow dx="0" dy="6.21" stdDeviation="8.7" flood-color="#000000" flood-opacity="0.2"/>
+      </filter>
     </defs>
 
-    <rect width="512" height="512" rx="116" fill="url(#background)"/>
+    <rect width="512" height="512" rx="116" fill="url(#background)" filter="url(#shadow)"/>
     <rect x="3" y="3" width="506" height="506" rx="113" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="6"/>
 
     <rect x="158" y="70" width="196" height="372" rx="43" fill="#191817" stroke="#f4f1ea" stroke-width="14"/>

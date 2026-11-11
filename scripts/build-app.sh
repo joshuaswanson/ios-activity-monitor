@@ -33,10 +33,15 @@ build_icon() {
     iconset="$work/AppIcon.iconset"
     icon_svg="$work/icon.svg"
     mkdir "$iconset"
-    # macOS icons sit on a 1024 canvas with a 100pt transparent margin.
+    # macOS icons sit on a 1024 canvas with a 100pt transparent margin. The
+    # Dock draws no shadow of its own, so the margin holds a baked one matching
+    # Apple's template.
     {
-        printf '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024">'
-        printf '<image x="100" y="100" width="824" height="824" xlink:href="data:image/svg+xml;base64,%s"/></svg>' \
+        printf '%s' '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024">'
+        printf '%s' '<defs><filter id="shadow" x="-25%" y="-25%" width="150%" height="150%">'
+        printf '%s' '<feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.2"/>'
+        printf '%s' '</filter></defs>'
+        printf '<image x="100" y="100" width="824" height="824" filter="url(#shadow)" xlink:href="data:image/svg+xml;base64,%s"/></svg>' \
             "$(base64 < "$ROOT/assets/logo.svg" | tr -d '\n')"
     } > "$icon_svg"
     for size in 16 32 128 256 512; do
