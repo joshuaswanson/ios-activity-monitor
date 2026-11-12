@@ -19,6 +19,8 @@ Download the `.dmg` from the [latest release](https://github.com/joshuaswanson/i
 
 The app is not notarized, so macOS blocks it the first time you open it. Open System Settings, go to Privacy & Security, and click Open Anyway next to the message about iOS Activity Monitor.
 
+The app checks for updates on its own through [Sparkle](https://sparkle-project.org). To check right away, choose Check for Updates from the iOS Activity Monitor menu.
+
 ## Requirements
 
 - A Mac with Apple silicon, running macOS 15 or later.
@@ -38,7 +40,9 @@ scripts/build-app.sh
 
 This produces `build/iOS Activity Monitor.app`. Drag it to `/Applications`.
 
-`scripts/package-dmg.sh` builds the app and packages it as the `.dmg` that goes on the releases page.
+`scripts/package-dmg.sh` builds the app and packages it as a `.dmg`.
+
+To publish a release, raise `CFBundleShortVersionString` and `CFBundleVersion` in `app/Resources/Info.plist`, push to `main`, and run `scripts/publish-release.sh "release notes"`. It uploads the `.dmg` and a Sparkle `appcast.xml` signed with the `ios-activity-monitor` key in your login keychain.
 
 ## How it works
 

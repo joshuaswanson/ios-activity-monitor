@@ -18,10 +18,12 @@ ENGINE="$RESOURCES/engine"
 PYTHON_VERSION="3.12"
 
 build_swift() {
+    local bin_path
     swift build --package-path "$ROOT/app" -c release --arch arm64
-    mkdir -p "$CONTENTS/MacOS" "$RESOURCES"
-    cp "$(swift build --package-path "$ROOT/app" -c release --arch arm64 --show-bin-path)/IOSActivityMonitor" \
-        "$CONTENTS/MacOS/iOS Activity Monitor"
+    bin_path="$(swift build --package-path "$ROOT/app" -c release --arch arm64 --show-bin-path)"
+    mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Frameworks" "$RESOURCES"
+    cp "$bin_path/IOSActivityMonitor" "$CONTENTS/MacOS/iOS Activity Monitor"
+    ditto "$bin_path/Sparkle.framework" "$CONTENTS/Frameworks/Sparkle.framework"
     cp "$ROOT/app/Resources/Info.plist" "$CONTENTS/Info.plist"
     cp -R "$ROOT/app/Resources/ui" "$RESOURCES/ui"
     cp "$ROOT/assets/logo.svg" "$RESOURCES/ui/logo.svg"

@@ -1,9 +1,15 @@
 import AppKit
+import Sparkle
 import SwiftUI
 
 @main
 struct IOSActivityMonitorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    private let updater = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
 
     var body: some Scene {
         Window("iOS Activity Monitor", id: "main") {
@@ -14,6 +20,11 @@ struct IOSActivityMonitorApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1040, height: 800)
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    updater.checkForUpdates(nil)
+                }
+            }
             CommandGroup(replacing: .newItem) {}
         }
     }
